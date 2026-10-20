@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>道具贪吃蛇 · 浏览器自测</title>
+<style>
+  body { background:#0b0b1a; color:#e7e9ff; font:14px/1.5 system-ui,sans-serif; padding:16px; }
+  h1 { font-size:18px; }
+  .sum { font-size:22px; font-weight:700; margin:8px 0; }
+  .ok { color:#5eead4; } .bad { color:#ff4d6d; }
+  ul { list-style:none; padding:0; margin:0; max-width:640px; }
+  li { padding:3px 0; border-bottom:1px solid #232347; font-family:monospace; font-size:12.5px; }
+  .fail { color:#ff7a90; }
+</style>
+</head>
+<body>
+  <h1>道具贪吃蛇 · 浏览器逻辑自测</h1>
+  <div class="sum" id="sum">运行中…</div>
+  <ul id="list"></ul>
+
+  <script src="../game.js"></script>
+  <script>
+    var G = window.ItemSnake;
+    var pass = 0, fail = 0; var rows = [];
+    function ok(name, cond, extra) {
+      if (cond) pass += 1; else { fail += 1; rows.push('<li class="fail">✗ ' + name + (extra ? ' → ' + extra : '') + '</li>'); }
+    }
+    function eq(name, a, b) { ok(name + ' (=' + b + ')', a === b, 'got ' + a); }
+
+    function placeItem(s, type, x, y) { s.items.push({ id: s.nextId++, type: type, x: x, y: y, ttl: G.SPECIAL_TTL_MS }); }
+    function front(s) { var h = s.snake[0]; var d = G.DIRS[s.dir]; return { x: h.x + d.x, y: h.y + d.y }; }
+
+    (function(){ var s=G.createGame({seed:12345}); eq('create:status',s.status,'ready'); eq('create:len',s.snake.length,G.START_LEN); ok('create:apple',!!s.apple); eq('create:items',s.items.length,0); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; var l0=s.snake.length,sc0=s.score; var f=front(s); s.apple={x:f.x,y:f.y}; var r=G.step(s); ok('apple:moved',r.moved); eq('apple:ate',r.ate,'apple'); eq('apple:score+1',s.score,sc0+1); eq('apple:len+1',s.snake.length,l0+1); ok('apple:respawn',!!s.apple); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; s.double=G.DOUBLE_MS; eq('double:mul',G.scoreMul(s),2); var f=front(s); s.apple={x:f.x,y:f.y}; G.step(s); eq('double:+2',s.score,2); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; var b=G.currentStepMs(s); var f=front(s); placeItem(s,'slow',f.x,f.y); G.step(s); ok('slow:on',s.slow>0); ok('slow:slower',G.currentStepMs(s)>b,b+'→'+G.currentStepMs(s)); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; var b=G.currentStepMs(s); var f=front(s); placeItem(s,'fast',f.x,f.y); G.step(s); ok('fast:on',s.fast>0); ok('fast:faster',G.currentStepMs(s)<b,b+'→'+G.currentStepMs(s)); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; var f=front(s); placeItem(s,'slow',f.x,f.y); G.step(s); ok('mutex:slow',s.slow>0&&s.fast===0); var f2=front(s); placeItem(s,'fast',f2.x,f2.y); G.step(s); ok('mutex:fast',s.fast>0&&s.slow===0); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; var t=s.snake[s.snake.length-1]; for(var i=0;i<7;i++) s.snake.push({x:t.x,y:t.y+1}); var l0=s.snake.length; var f=front(s); placeItem(s,'shrink',f.x,f.y); G.step(s); eq('shrink:-3',s.snake.length,l0-3); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; var l0=s.snake.length; var f=front(s); placeItem(s,'shrink',f.x,f.y); G.step(s); ok('shrink:floor',s.snake.length>=G.START_LEN,'len='+s.snake.length); eq('shrink:noshrink',s.snake.length,l0); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; var f=front(s); placeItem(s,'poison',f.x,f.y); G.step(s); ok('poison:dead',!s.alive); eq('poison:cause',s.cause,'poison'); eq('poison:status',s.status,'over'); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; s.dir='left'; s.queue=[]; s.snake=[{x:0,y:10},{x:1,y:10},{x:2,y:10}]; s.apple={x:5,y:5}; G.step(s); ok('wall:dead',!s.alive&&s.cause==='wall'); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; s.dir='right'; s.queue=[]; s.snake=[{x:5,y:5},{x:4,y:5},{x:4,y:6},{x:5,y:6},{x:6,y:6},{x:6,y:5},{x:6,y:4}]; s.apple=null; G.step(s); ok('self:dead',!s.alive&&s.cause==='self','cause='+s.cause); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; s.dir='right'; s.queue=[]; eq('buf:up',G.turn(s,'up'),'ok'); eq('buf:dup',G.turn(s,'up'),'duplicate'); eq('buf:rev',G.turn(s,'down'),'reverse'); eq('buf:left',G.turn(s,'left'),'ok'); eq('buf:full',G.turn(s,'up'),'buffer_full'); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; for(var i=0;i<20;i++) G.spawnSpecial(s); ok('spawn:cap',s.items.length<=G.MAX_SPECIAL,'len='+s.items.length); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; var b=s.items.length; G.updateTimers(s,G.SPAWN_INTERVAL_MS+1); ok('spawn:one',s.items.length===b+1,'len='+s.items.length); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; s.spawnAcc=-1e9; placeItem(s,'slow',10,10); s.items[0].ttl=100; G.updateTimers(s,200); eq('spawn:expire',s.items.length,0); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; s.double=G.DOUBLE_MS; G.updateTimers(s,G.DOUBLE_MS-100); ok('age:on',s.double>0); G.updateTimers(s,200); eq('age:off',s.double,0); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; s.score=12; s.alive=false; s.status='over'; s.cause='self'; s.status='playing'; s.alive=true; s.cause=null; s.dir='left'; s.queue=[]; s.snake=[{x:0,y:10},{x:1,y:10},{x:2,y:10}]; s.apple={x:5,y:5}; G.step(s); ok('best:new',s.newBest===true); eq('best:upd',s.best,12); })();
+    (function(){ var s=G.createGame({seed:7}); s.status='playing'; var l0=s.snake.length; for(var i=0;i<50;i++) G.advance(s,16); ok('advance:steps',s.steps>0,'steps='+s.steps); ok('advance:len',s.snake.length===l0||s.status==='over'); })();
+
+    var list = document.getElementById('list');
+    rows.forEach(function(r){ list.insertAdjacentHTML('beforeend', r); });
+    var sum = document.getElementById('sum');
+    sum.innerHTML = '<span class="' + (fail ? 'bad' : 'ok') + '">逻辑断言：' + pass + ' 通过 / ' + fail + ' 失败</span>';
+    window.__selftest = { pass: pass, fail: fail };
+  </script>
+</body>
+</html>

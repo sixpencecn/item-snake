@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="theme-color" content="#0b0b1a" />
+<title>道具贪吃蛇 · Item Snake</title>
+<style>
+  :root {
+    --bg: #0b0b1a;
+    --panel: #14142b;
+    --line: #232347;
+    --txt: #e7e9ff;
+    --muted: #8b8fc7;
+    --apple: #ff4d6d;
+    --slow: #38bdf8;
+    --fast: #fb923c;
+    --shrink: #a855f7;
+    --poison: #39ff14;
+    --double: #f472b6;
+    --snake: #5eead4;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(1200px 800px at 50% -10%, #1a1a3a 0%, var(--bg) 60%);
+    color: var(--txt);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex;
+    padding: 14px; min-height: 100%;
+  }
+  /* margin:auto 在内容高于视口时自动回退为顶部对齐，避免 flex 居中把顶部裁掉 */
+  .wrap { width: 100%; max-width: 760px; margin: auto; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
+  h1 .em { color: var(--apple); }
+  .scores { display: flex; gap: 14px; font-variant-numeric: tabular-nums; }
+  .scores b { font-size: 20px; }
+  .scores .lbl { color: var(--muted); font-size: 12px; display: block; }
+  .stage {
+    position: relative; width: 100%; aspect-ratio: 1 / 1;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.45);
+    touch-action: none;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px; text-align: center;
+    background: rgba(7,7,18,.72); backdrop-filter: blur(3px); padding: 20px;
+  }
+  .overlay[hidden] { display: none; }
+  .overlay h2 { margin: 0; font-size: 26px; }
+  .overlay p { margin: 0; color: var(--muted); max-width: 320px; }
+  .overlay .big { font-size: 34px; color: var(--apple); font-variant-numeric: tabular-nums; }
+  .overlay .newbest { color: var(--double); font-weight: 700; }
+  .btn {
+    margin-top: 6px; border: 1px solid var(--line); background: #1c1c3a; color: var(--txt);
+    padding: 10px 18px; border-radius: 10px; font-size: 15px; cursor: pointer;
+  }
+  .btn:active { transform: translateY(1px); }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#1c1c3a; border:1px solid var(--line); font-size:12px; }
+
+  .panel { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
+  .effects { display: flex; flex-wrap: wrap; gap: 8px; min-height: 30px; }
+  .chip {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px;
+    background: #1c1c3a; border: 1px solid var(--line); font-size: 13px; position: relative; overflow: hidden;
+  }
+  .chip .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+  .chip .bar { position: absolute; left: 0; bottom: 0; height: 3px; background: currentColor; opacity: .8; }
+  .chip.empty { color: var(--muted); border-style: dashed; }
+
+  .legend { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .legend .item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .legend .sw { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+  .hint { color: var(--muted); font-size: 12.5px; }
+  .hint kbd {
+    background: #1c1c3a; border: 1px solid var(--line); border-bottom-width: 2px;
+    border-radius: 6px; padding: 1px 6px; font-family: inherit; font-size: 12px;
+  }
+  @media (max-width: 560px) {
+    .legend { grid-template-columns: 1fr; }
+    h1 { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>道具<span class="em">贪吃蛇</span> · Item Snake</h1>
+      <div class="scores">
+        <div><span class="lbl">得分</span><b id="score">0</b></div>
+        <div><span class="lbl">最高</span><b id="best">0</b></div>
+      </div>
+    </header>
+
+    <div class="stage" id="stage" role="application" aria-label="道具贪吃蛇游戏区，使用方向键或 WASD 控制转向">
+      <canvas id="cv"></canvas>
+
+      <div class="overlay" id="ovReady">
+        <h2>道具贪吃蛇</h2>
+        <p>方向键 / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 或滑动转向。<br/>小心毒药 ☠，善用加速 🚀 与双倍 ✨！</p>
+        <button class="btn" id="btnStart">开始游戏（空格）</button>
+      </div>
+
+      <div class="overlay" id="ovPause" hidden>
+        <h2>已暂停</h2>
+        <p>按 <kbd>空格</kbd> 继续</p>
+      </div>
+
+      <div class="overlay" id="ovOver" hidden>
+        <h2 id="overTitle">游戏结束</h2>
+        <p id="overSub">按 R 重新开始</p>
+        <div class="big" id="overScore">0</div>
+        <div id="overBest" class="newbest" hidden>🏆 新纪录！</div>
+        <button class="btn" id="btnRestart">再来一局（R）</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="effects" id="effects" aria-live="polite">
+        <span class="chip empty">暂无激活效果</span>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="hint">
+        转向：<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>
+        &nbsp;·&nbsp; 暂停：<kbd>空格</kbd> &nbsp;·&nbsp; 重开：<kbd>R</kbd>
+        &nbsp;·&nbsp; 移动端：在场地内滑动
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
